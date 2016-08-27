@@ -10,6 +10,8 @@ import (
 	"net"
 	"sync"
 	"time"
+	"flag"
+	"strconv"
 )
 
 const (
@@ -217,7 +219,49 @@ func read32(conn net.Conn) ([32]byte, error) {
 	_, err := io.ReadFull(conn, data[:])
 	return data, err
 }
-
-func main() {
-
+func addPeer(conn net.Conn){
+	peer:=Peer{conn:conn,}
+		peersLock.Lock()
+		peers=append(peers,peer)
+		peersLock.Unlock()
+		go peer.listen()
 }
+func listen(port int) {
+	listen,err:=net.Listen("tcp",":"+strconv.Itoa(port))
+	if err!=nil{
+		panic(err)
+	}
+	fmt.Println("Listening on",port)
+	for{
+		conn,err:=listen.Accept()
+		if err!=nil{
+			panic(err)
+		}
+		fmt.Println("Connection from ",conn)
+		addPeer(conn)
+	}
+}
+func connect(port int){
+	fmt.Println("Connecting to",port)
+	conn,err:=net.Dial("tcp","localhost:"+strconv.Itoa(port))
+	if err!=nil{
+		panic(err)
+	}
+	addPeer(conn)
+}
+func main(){
+	listenPort:=flag.Int("listen",-1,"port to listen on")
+	connectPort:=flag.Int("connect",-1,"port to connect to")
+	createAndMine:=flag.Bool("create",false,"create and mine a post, as a test")
+	flag.Parse()
+	if *connectPort!=-1{
+		connect(*connectPort)
+	}
+	if *createAndMine{
+		go func(){
+			//do so
+		}()
+	}
+	listen(*listenPort)//this goes last because it blocks
+}
+
