@@ -94,35 +94,3 @@ func (post *Post) BroadcastNonceUpdate() {
 	}
 	peersLock.Unlock()
 }
-
-// Listen starts a listener for notifications to that peer
-func (peer *Peer) Listen() error {
-	defer peer.Conn.Close()
-	defer peer.remove()
-	for {
-		msgType := make([]byte, 1)
-		_, err := peer.Conn.Read(msgType)
-		if err != nil {
-			return err
-		}
-		switch msgType[0] {
-		case PacketNonceUpdate:
-			err := readPacketNonceUpdate(peer)
-			if err != nil {
-				return err
-			}
-		case PacketPostContents:
-			err := readPacketPostContents(peer)
-			if err != nil {
-				return err
-			}
-		case PacketPostContentsRequest:
-			err := readPacketPostContentsRequest(peer)
-			if err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("Unexpected prefix byte %d", int(msgType[0]))
-		}
-	}
-}
