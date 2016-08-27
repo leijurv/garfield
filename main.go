@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math/rand"
@@ -99,7 +98,12 @@ func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom
 			post.nonce = newNonce
 			postsLock.Unlock()
 			fmt.Println("Updating post nonce from", oldNonce[:], "to", newNonce[:])
-			//send out update here
+			message:=append(append([]byte{PacketNonceUpdate},postPayloadHash[:]...),newNonce[:]...)
+			peersLock.Lock()
+			for _,peer:=range peers{
+				go peer.send(message)
+			}
+			peersLock.Unlock()
 		}else{
 			postsLock.Unlock()
 		}
