@@ -74,8 +74,10 @@ func (post *Post) mine(count int) {
 		newHash := sha256.Sum256(append(post.payloadRaw, nonce[:]...))
 		if bytes.Compare(newHash[:], currentHash[:]) < 0 {
 			currentHash = newHash
+			postsLock.Lock()
 			post.nonce = nonce
 			post.mostRecentNonceUpdate = time.Now()
+			postsLock.Unlock()
 			fmt.Println("Nonce improvement, hash is now ", newHash)
 			post.broadcastNonceUpdate()
 		}
