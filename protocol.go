@@ -7,18 +7,19 @@ import (
 	"time"
 )
 
+// Update ids sent to peers
 const (
 	PacketNonceUpdate         uint8 = iota
 	PacketPostContents
 	PacketPostContentsRequest
 )
 
-func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom *Peer) {
+func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom *Peer) error {
 	postsLock.Lock()
 	post, ok := posts[postPayloadHash]
 
 	if ok {
-		comparison := post.checkPossibleNonce(newNonce)
+		comparison := post.CheckPossibleNonce(newNonce)
 		if comparison < 0 {
 			oldNonce := post.nonce
 			post.nonce = newNonce
@@ -31,15 +32,21 @@ func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom
 			if comparison != 0 { //its not equal, they actaully just proudly gave us a nonce that's WORSE
 				//wow you're behind the times. let's help you out
 				fmt.Println("Helping out peer", peerFrom, " that's behind the times")
-				go peerFrom.Send(append(append([]byte{PacketNonceUpdate}, postPayloadHash[:]...), post.nonce[:]...))
+				err := peerFrom.Send(append(append([]byte{PacketNonceUpdate}, postPayloadHash[:]...), post.nonce[:]...))
+				if err != nil {
+					return err
+				}
 			}
 		}
 	} else {
 		postsLock.Unlock()
 		//ask the peer we received this from for the contents of the post because we don't have it
-		peerFrom.Send(append([]byte{PacketPostContentsRequest}, postPayloadHash[:]...))
+		err :=peerFrom.Send(append([]byte{PacketPostContentsRequest}, postPayloadHash[:]...))
+		if err != nil {
+			return err
+		}
 	}
-
+	return nil
 }
 
 func onPostContentsReceived(payloadRaw []byte, nonce [32]byte, peerFrom *Peer) {
@@ -56,7 +63,7 @@ func onPostContentsReceived(payloadRaw []byte, nonce [32]byte, peerFrom *Peer) {
 		//dont have it, lets add it
 		now := time.Now()
 		post := Post{
-			payloadRaw:            payloadRaw,
+			PayloadRaw:            payloadRaw,
 			nonce:                 nonce,
 			firstReceived:         now,
 			mostRecentNonceUpdate: now,
@@ -66,19 +73,23 @@ func onPostContentsReceived(payloadRaw []byte, nonce [32]byte, peerFrom *Peer) {
 		fmt.Println("Added post with payload hash", post.PayloadHash(), "and normal hash", post.Hash())
 	}
 }
-func onPostContentsRequested(payloadHash [32]byte, peerFrom *Peer) {
+func onPostContentsRequested(payloadHash [32]byte, peerFrom *Peer) error {
 	postsLock.Lock()
 	post, ok := posts[payloadHash]
 	postsLock.Unlock()
 	if ok {
 		payloadLenBytes := make([]byte, 2)
-		binary.LittleEndian.PutUint16(payloadLenBytes, uint16(len(post.payloadRaw)))
+		binary.LittleEndian.PutUint16(payloadLenBytes, uint16(len(post.PayloadRaw)))
 		fmt.Println("Sending contents of ", payloadHash)
 		//man I wish go was better at appending mulitple arrays. lol im probbaly doing something wrong here. BUT HEY, IT WORKS
-		message := append(append(append([]byte{PacketPostContents}, payloadLenBytes...), post.payloadRaw...), post.nonce[:]...)
+		message := append(append(append([]byte{PacketPostContents}, payloadLenBytes...), post.PayloadRaw...), post.nonce[:]...)
 		fmt.Println("data:", message)
-		peerFrom.Send(message)
-	} else {
-		//um idk we don't have it. just ignore lol
+		err := peerFrom.Send(message)
+		if err != nil {
+			return err
+		}
 	}
+	//um idk we don't have it. just ignore lol
+
+	return nil
 }

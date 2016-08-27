@@ -6,44 +6,15 @@ import (
 	"io"
 	"net"
 	"strconv"
-	"errors"
 )
 
-func (peer *Peer) Listen() error {
-	defer peer.conn.Close()
-	for {
-		msgType := make([]byte, 1)
-		_, err := peer.conn.Read(msgType)
-		if err != nil {
-			return err
-		}
-		switch msgType[0] {
-		case PacketNonceUpdate:
-			err := readPacketNonceUpdate(peer)
-			if err != nil {
-				return err
-			}
-		case PacketPostContents:
-			err := readPacketPostContents(peer)
-			if err != nil {
-				return err
-			}
-		case PacketPostContentsRequest:
-			err := readPacketPostContentsRequest(peer)
-			if err != nil {
-				return err
-			}
-		default:
-			return errors.New("Unexpected prefix byte"+strconv.Itoa(int(msgType[0])))
-		}
-	}
-}
+
 func readPacketNonceUpdate(peer *Peer) error {
-	payloadHash, err := read32(peer.conn)
+	payloadHash, err := read32(peer.Conn)
 	if err != nil {
 		return err
 	}
-	newNonce, err := read32(peer.conn)
+	newNonce, err := read32(peer.Conn)
 	if err != nil {
 		return err
 	}
@@ -52,7 +23,7 @@ func readPacketNonceUpdate(peer *Peer) error {
 	return nil
 }
 func readPacketPostContentsRequest(peer *Peer) error {
-	requestedPayloadHash, err := read32(peer.conn)
+	requestedPayloadHash, err := read32(peer.Conn)
 	if err != nil {
 		return err
 	}
@@ -62,18 +33,18 @@ func readPacketPostContentsRequest(peer *Peer) error {
 }
 func readPacketPostContents(peer *Peer) error {
 	payloadLenBytes := make([]byte, 2)
-	_, err := io.ReadFull(peer.conn, payloadLenBytes)
+	_, err := io.ReadFull(peer.Conn, payloadLenBytes)
 	if err != nil {
 		return err
 	}
 	payloadLen := int(binary.LittleEndian.Uint16(payloadLenBytes))
 	fmt.Println("Reading payload with len", payloadLen)
 	payload := make([]byte, payloadLen)
-	_, err = io.ReadFull(peer.conn, payload)
+	_, err = io.ReadFull(peer.Conn, payload)
 	if err != nil {
 		return err
 	}
-	nonce, err := read32(peer.conn)
+	nonce, err := read32(peer.Conn)
 	if err != nil {
 		return err
 	}
@@ -81,6 +52,8 @@ func readPacketPostContents(peer *Peer) error {
 	go onPostContentsReceived(payload, nonce, peer)
 	return nil
 }
+
+// Listen is the listener port to get notifications
 func Listen(port int) error {
 	listen, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
@@ -96,6 +69,8 @@ func Listen(port int) error {
 		AddPeer(conn)
 	}
 }
+
+// Connect connects and adds a peer
 func Connect(port int) error {
 	fmt.Println("Connecting to", port)
 	conn, err := net.Dial("tcp", "localhost:"+strconv.Itoa(port))

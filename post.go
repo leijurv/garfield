@@ -10,7 +10,7 @@ import (
 
 // Post is a post to garfield
 type Post struct {
-	payloadRaw            []byte
+	PayloadRaw            []byte
 	nonce                 [32]byte
 	firstReceived         time.Time
 	mostRecentNonceUpdate time.Time
@@ -19,32 +19,45 @@ type Post struct {
 var posts = make(map[[32]byte]*Post)
 var postsLock sync.Mutex
 
+// PayloadHash gets the hash of the payload
 func (post *Post) PayloadHash() [32]byte {
-	return sha256.Sum256(post.payloadRaw)
+	return sha256.Sum256(post.PayloadRaw)
 }
+
+// Hash gets the hash of the payload and the nonce
 func (post *Post) Hash() [32]byte {
-	combined := append(post.payloadRaw, post.nonce[:]...)
+	return post.hashNonce(post.nonce)
+}
+
+func (post *Post) hashNonce(nonce [32]byte) [32]byte {
+	combined := append(post.PayloadRaw, nonce[:]...)
 	return sha256.Sum256(combined)
 }
-func (post *Post) checkPossibleNonce(newNonce [32]byte) int {
+
+// CheckPossibleNonce compares the new nonce hash with the old one
+func (post *Post) CheckPossibleNonce(newNonce [32]byte) int {
 	if bytes.Equal(newNonce[:], post.nonce[:]) {
 		return 0
 	}
-	newHash := sha256.Sum256(append(post.payloadRaw, newNonce[:]...))
+	newHash := post.hashNonce(newNonce)
 	oldHash := post.Hash()
 	comparison := bytes.Compare(newHash[:], oldHash[:])
 	return comparison
 }
+
+// Insert adds a post to the list
 func (post *Post) Insert() {
 	postsLock.Lock()
 	posts[post.PayloadHash()] = post
 	postsLock.Unlock()
 }
+
+// Mine does something
 func (post *Post) Mine(count int) {
 	currentHash := post.Hash()
 	nonce := randomNonce()
 	for i := 0; i < count; i++ {
-		newHash := sha256.Sum256(append(post.payloadRaw, nonce[:]...))
+		newHash := sha256.Sum256(append(post.PayloadRaw, nonce[:]...))
 		if bytes.Compare(newHash[:], currentHash[:]) < 0 {
 			currentHash = newHash
 			postsLock.Lock()
@@ -68,6 +81,8 @@ func (post *Post) Mine(count int) {
 		}
 	}
 }
+
+// BroadcastNonceUpdate sends out the update to all peers
 func (post *Post) BroadcastNonceUpdate() {
 	postPayloadHash := post.PayloadHash()
 	newNonce := post.nonce
@@ -78,4 +93,35 @@ func (post *Post) BroadcastNonceUpdate() {
 		go peer.Send(message)
 	}
 	peersLock.Unlock()
+}
+
+// Listen starts a listener for notifications to that peer
+func (peer *Peer) Listen() error {
+	defer peer.Conn.Close()
+	for {
+		msgType := make([]byte, 1)
+		_, err := peer.Conn.Read(msgType)
+		if err != nil {
+			return err
+		}
+		switch msgType[0] {
+		case PacketNonceUpdate:
+			err := readPacketNonceUpdate(peer)
+			if err != nil {
+				return err
+			}
+		case PacketPostContents:
+			err := readPacketPostContents(peer)
+			if err != nil {
+				return err
+			}
+		case PacketPostContentsRequest:
+			err := readPacketPostContentsRequest(peer)
+			if err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("Unexpected prefix byte %d", int(msgType[0]))
+		}
+	}
 }
