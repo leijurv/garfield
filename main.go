@@ -32,7 +32,7 @@ type Peer struct {
 	writeLock sync.Mutex
 }
 
-var peers []Peer
+var peers []*Peer
 var peersLock sync.Mutex
 
 var posts map[[32]byte]*Post = make(map[[32]byte]*Post)
@@ -239,7 +239,7 @@ func read32(conn net.Conn) ([32]byte, error) {
 func addPeer(conn net.Conn) {
 	peer := Peer{conn: conn}
 	peersLock.Lock()
-	peers = append(peers, peer)
+	peers = append(peers, &peer)
 	peersLock.Unlock()
 	go peer.listen()
 }
