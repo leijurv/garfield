@@ -24,7 +24,7 @@ func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom
 			post.nonce = newNonce
 			post.mostRecentNonceUpdate = time.Now()
 			postsLock.Unlock()
-			fmt.Println("Updating post nonce from", oldNonce[:], "to", newNonce[:])
+			fmt.Println("Updating post nonce from", oldNonce[:], "to", newNonce[:], ". Post hash is now", post.hash())
 			post.broadcastNonceUpdate()
 		} else {
 			postsLock.Unlock()
