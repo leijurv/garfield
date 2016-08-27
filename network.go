@@ -9,7 +9,7 @@ import (
 	"errors"
 )
 
-func (peer *Peer) listen() error {
+func (peer *Peer) Listen() error {
 	defer peer.conn.Close()
 	for {
 		msgType := make([]byte, 1)
@@ -81,26 +81,27 @@ func readPacketPostContents(peer *Peer) error {
 	go onPostContentsReceived(payload, nonce, peer)
 	return nil
 }
-func listen(port int) {
+func Listen(port int) error {
 	listen, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
-		panic(err)
+		return err
 	}
 	fmt.Println("Listening on", port)
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
-			panic(err)
+			return err
 		}
 		fmt.Println("Connection from ", conn)
-		addPeer(conn)
+		AddPeer(conn)
 	}
 }
-func connect(port int) {
+func Connect(port int) error {
 	fmt.Println("Connecting to", port)
 	conn, err := net.Dial("tcp", "localhost:"+strconv.Itoa(port))
 	if err != nil {
-		panic(err)
+		return err
 	}
-	addPeer(conn)
+	AddPeer(conn)
+	return nil
 }
