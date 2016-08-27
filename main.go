@@ -105,6 +105,7 @@ func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom
 	} else {
 		postsLock.Unlock()
 		//ask the peer we received this from for the contents of the post because we don't have it
+		peerFrom.send(append([]byte{PacketPostContentsRequest},postPayloadHash[:]...))
 	}
 
 }
