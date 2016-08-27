@@ -2,15 +2,16 @@ package main
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"strconv"
-	"errors"
 )
 
 func (peer *Peer) listen() error {
 	defer peer.conn.Close()
+	defer peer.remove()
 	for {
 		msgType := make([]byte, 1)
 		_, err := peer.conn.Read(msgType)
@@ -34,7 +35,7 @@ func (peer *Peer) listen() error {
 				return err
 			}
 		default:
-			return errors.New("Unexpected prefix byte"+strconv.Itoa(int(msgType[0])))
+			return errors.New("Unexpected prefix byte" + strconv.Itoa(int(msgType[0])))
 		}
 	}
 }
