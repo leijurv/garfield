@@ -98,6 +98,7 @@ func (post *Post) BroadcastNonceUpdate() {
 // Listen starts a listener for notifications to that peer
 func (peer *Peer) Listen() error {
 	defer peer.Conn.Close()
+	defer peer.remove()
 	for {
 		msgType := make([]byte, 1)
 		_, err := peer.Conn.Read(msgType)
