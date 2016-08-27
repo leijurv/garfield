@@ -4,14 +4,14 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"io"
 	"math/rand"
 	"net"
+	"strconv"
 	"sync"
 	"time"
-	"flag"
-	"strconv"
 )
 
 const (
@@ -62,9 +62,9 @@ func randomNonce() [32]byte {
 	copy(nonce[:], fixedLengthIsBS)
 	return nonce
 }
-func (post *Post) insert(){
+func (post *Post) insert() {
 	postsLock.Lock()
-	posts[post.payloadHash()]=post
+	posts[post.payloadHash()] = post
 	postsLock.Unlock()
 }
 func (post *Post) mine(count int) {
@@ -97,7 +97,7 @@ func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom
 	post, ok := posts[postPayloadHash]
 
 	if ok {
-		comparison:=post.checkPossibleNonce(newNonce)
+		comparison := post.checkPossibleNonce(newNonce)
 		if comparison < 0 {
 			oldNonce := post.nonce
 			post.nonce = newNonce
@@ -106,11 +106,11 @@ func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom
 			post.broadcastNonceUpdate()
 		} else {
 			postsLock.Unlock()
-			if comparison!=0{//its not equal, they actaully just proudly gave us a nonce that's WORSE
-			//wow you're behind the times. let's help you out
-			fmt.Println("Helping out peer",peerFrom," that's behind the times")
-			go peerFrom.send(append(append([]byte{PacketNonceUpdate},postPayloadHash[:]...),post.nonce[:]...))
-		}
+			if comparison != 0 { //its not equal, they actaully just proudly gave us a nonce that's WORSE
+				//wow you're behind the times. let's help you out
+				fmt.Println("Helping out peer", peerFrom, " that's behind the times")
+				go peerFrom.send(append(append([]byte{PacketNonceUpdate}, postPayloadHash[:]...), post.nonce[:]...))
+			}
 		}
 	} else {
 		postsLock.Unlock()
@@ -131,7 +131,7 @@ func (post *Post) broadcastNonceUpdate() {
 	peersLock.Unlock()
 }
 func onPostContentsReceived(payloadRaw []byte, nonce [32]byte, peerFrom *Peer) {
-	fmt.Println("Post contents:",payloadRaw)
+	fmt.Println("Post contents:", payloadRaw)
 	payloadHash := sha256.Sum256(payloadRaw)
 	postsLock.Lock()
 	_, ok := posts[payloadHash]
@@ -164,7 +164,7 @@ func onPostContentsRequested(payloadHash [32]byte, peerFrom *Peer) {
 		fmt.Println("Sending contents of ", payloadHash)
 		//man I wish go was better at appending mulitple arrays. lol im probbaly doing something wrong here. BUT HEY, IT WORKS
 		message := append(append(append([]byte{PacketPostContents}, payloadLenBytes...), post.payloadRaw...), post.nonce[:]...)
-		fmt.Println("data:",message)
+		fmt.Println("data:", message)
 		peerFrom.send(message)
 	} else {
 		//um idk we don't have it. just ignore lol
@@ -202,7 +202,7 @@ func (peer *Peer) listen() error {
 				return err
 			}
 			payloadLen := int(binary.LittleEndian.Uint16(payloadLenBytes))
-			fmt.Println("Reading payload with len",payloadLen)
+			fmt.Println("Reading payload with len", payloadLen)
 			payload := make([]byte, payloadLen)
 			_, err = io.ReadFull(peer.conn, payload)
 			if err != nil {
@@ -232,54 +232,53 @@ func read32(conn net.Conn) ([32]byte, error) {
 	_, err := io.ReadFull(conn, data[:])
 	return data, err
 }
-func addPeer(conn net.Conn){
-	peer:=Peer{conn:conn,}
-		peersLock.Lock()
-		peers=append(peers,peer)
-		peersLock.Unlock()
-		go peer.listen()
+func addPeer(conn net.Conn) {
+	peer := Peer{conn: conn}
+	peersLock.Lock()
+	peers = append(peers, peer)
+	peersLock.Unlock()
+	go peer.listen()
 }
 func listen(port int) {
-	listen,err:=net.Listen("tcp",":"+strconv.Itoa(port))
-	if err!=nil{
+	listen, err := net.Listen("tcp", ":"+strconv.Itoa(port))
+	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Listening on",port)
-	for{
-		conn,err:=listen.Accept()
-		if err!=nil{
+	fmt.Println("Listening on", port)
+	for {
+		conn, err := listen.Accept()
+		if err != nil {
 			panic(err)
 		}
-		fmt.Println("Connection from ",conn)
+		fmt.Println("Connection from ", conn)
 		addPeer(conn)
 	}
 }
-func connect(port int){
-	fmt.Println("Connecting to",port)
-	conn,err:=net.Dial("tcp","localhost:"+strconv.Itoa(port))
-	if err!=nil{
+func connect(port int) {
+	fmt.Println("Connecting to", port)
+	conn, err := net.Dial("tcp", "localhost:"+strconv.Itoa(port))
+	if err != nil {
 		panic(err)
 	}
 	addPeer(conn)
 }
-func main(){
-	listenPort:=flag.Int("listen",-1,"port to listen on")
-	connectPort:=flag.Int("connect",-1,"port to connect to")
-	createAndMine:=flag.Bool("create",false,"create and mine a post, as a test")
+func main() {
+	listenPort := flag.Int("listen", -1, "port to listen on")
+	connectPort := flag.Int("connect", -1, "port to connect to")
+	createAndMine := flag.Bool("create", false, "create and mine a post, as a test")
 	flag.Parse()
-	if *connectPort!=-1{
+	if *connectPort != -1 {
 		connect(*connectPort)
 	}
-	if *createAndMine{
-		go func(){
-			post:=Post{
-				payloadRaw:[]byte{5,0,2,1},
+	if *createAndMine {
+		go func() {
+			post := Post{
+				payloadRaw: []byte{5, 0, 2, 1},
 			}
 			post.insert()
 			post.mine(20000000)
 
 		}()
 	}
-	listen(*listenPort)//this goes last because it blocks
+	listen(*listenPort) //this goes last because it blocks
 }
-
