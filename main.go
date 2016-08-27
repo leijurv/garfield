@@ -46,7 +46,7 @@ func (post *Post) hash() [32]byte {
 	return sha256.Sum256(combined)
 }
 func (post *Post) checkPossibleNonce(newNonce [32]byte) int {
-	if bytes.Compare(newNonce[:], post.nonce[:]) == 0 {
+	if bytes.Equal(newNonce[:], post.nonce[:]) {
 		return 0
 	}
 	newHash := sha256.Sum256(append(post.payloadRaw, newNonce[:]...))
