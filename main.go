@@ -98,12 +98,7 @@ func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom
 			post.nonce = newNonce
 			postsLock.Unlock()
 			fmt.Println("Updating post nonce from", oldNonce[:], "to", newNonce[:])
-			message:=append(append([]byte{PacketNonceUpdate},postPayloadHash[:]...),newNonce[:]...)
-			peersLock.Lock()
-			for _,peer:=range peers{
-				go peer.send(message)
-			}
-			peersLock.Unlock()
+			post.broadcastNonceUpdate()
 		}else{
 			postsLock.Unlock()
 		}
@@ -113,6 +108,16 @@ func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom
 		peerFrom.send(append([]byte{PacketPostContentsRequest},postPayloadHash[:]...))
 	}
 
+}
+func (post *Post) broadcastNonceUpdate(){
+	postPayloadHash:=post.payloadHash()
+	newNonce:=post.nonce
+	message:=append(append([]byte{PacketNonceUpdate},postPayloadHash[:]...),newNonce[:]...)
+			peersLock.Lock()
+			for _,peer:=range peers{
+				go peer.send(message)
+			}
+			peersLock.Unlock()
 }
 func onPostContentsReceived(payloadRaw []byte, nonce [32]byte, peerFrom *Peer) {
 	payloadHash := sha256.Sum256(payloadRaw)
@@ -214,8 +219,6 @@ func read32(conn net.Conn) ([32]byte, error) {
 }
 
 func main() {
-	toMine := Post{payloadRaw: []byte("wewlad")}
-	fmt.Println(toMine.hash())
-	toMine.mine(10000000)
-	fmt.Println(toMine.hash())
+	
+
 }
