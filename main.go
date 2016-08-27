@@ -56,6 +56,7 @@ func (post *Post) mine(count int){
 		if bytes.Compare(newHash[:],currentHash[:])<0{
 			currentHash=newHash
 			post.nonce=nonce
+			fmt.Println("Nonce improvement, hash is now ",newHash)
 		}
 		nonce=increment(nonce)
 	}
@@ -70,6 +71,6 @@ func (post *Post) onNewNonceReceived(newNonce [32]byte){
 func main(){
 	toMine:=Post{payloadRaw:[]byte("wewlad")}
 	fmt.Println(toMine.hash())
-	toMine.mine(1000000)
+	toMine.mine(10000000)
 	fmt.Println(toMine.hash())
 }
