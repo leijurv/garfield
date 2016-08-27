@@ -6,9 +6,11 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"errors"
 )
 
 func (peer *Peer) listen() error {
+	defer peer.conn.Close()
 	for {
 		msgType := make([]byte, 1)
 		_, err := peer.conn.Read(msgType)
@@ -32,8 +34,7 @@ func (peer *Peer) listen() error {
 				return err
 			}
 		default:
-			peer.conn.Close()
-			fmt.Println("Unexpected prefix byte", msgType)
+			return errors.New("Unexpected prefix byte"+strconv.Itoa(int(msgType[0])))
 		}
 	}
 }
