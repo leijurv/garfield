@@ -35,7 +35,7 @@ type Peer struct {
 var peers []Peer
 var peersLock sync.Mutex
 
-var posts map[[32]byte]Post
+var posts map[[32]byte]*Post = make(map[[32]byte]*Post)
 var postsLock sync.Mutex
 
 func (post *Post) payloadHash() [32]byte {
@@ -45,18 +45,14 @@ func (post *Post) hash() [32]byte {
 	combined := append(post.payloadRaw, post.nonce[:]...)
 	return sha256.Sum256(combined)
 }
-func (post *Post) checkPossibleNonce(newNonce [32]byte) bool {
+func (post *Post) checkPossibleNonce(newNonce [32]byte) int {
 	if bytes.Compare(newNonce[:], post.nonce[:]) == 0 {
-		return false
+		return 0
 	}
 	newHash := sha256.Sum256(append(post.payloadRaw, newNonce[:]...))
 	oldHash := post.hash()
 	comparison := bytes.Compare(newHash[:], oldHash[:])
-	if comparison < 0 {
-		//new hash is less than old, so this nonce is an improvement
-		return true
-	}
-	return false
+	return comparison
 }
 func randomNonce() [32]byte {
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -65,6 +61,11 @@ func randomNonce() [32]byte {
 	var nonce [32]byte
 	copy(nonce[:], fixedLengthIsBS)
 	return nonce
+}
+func (post *Post) insert(){
+	postsLock.Lock()
+	posts[post.payloadHash()]=post
+	postsLock.Unlock()
 }
 func (post *Post) mine(count int) {
 	currentHash := post.hash()
@@ -75,6 +76,7 @@ func (post *Post) mine(count int) {
 			currentHash = newHash
 			post.nonce = nonce
 			fmt.Println("Nonce improvement, hash is now ", newHash)
+			post.broadcastNonceUpdate()
 		}
 		nonce[31]++
 		if nonce[31] == 0 {
@@ -95,7 +97,8 @@ func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom
 	post, ok := posts[postPayloadHash]
 
 	if ok {
-		if post.checkPossibleNonce(newNonce) {
+		comparison:=post.checkPossibleNonce(newNonce)
+		if comparison < 0 {
 			oldNonce := post.nonce
 			post.nonce = newNonce
 			postsLock.Unlock()
@@ -103,6 +106,11 @@ func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom
 			post.broadcastNonceUpdate()
 		} else {
 			postsLock.Unlock()
+			if comparison!=0{//its not equal, they actaully just proudly gave us a nonce that's WORSE
+			//wow you're behind the times. let's help you out
+			fmt.Println("Helping out peer",peerFrom," that's behind the times")
+			go peerFrom.send(append(append([]byte{PacketNonceUpdate},postPayloadHash[:]...),post.nonce[:]...))
+		}
 		}
 	} else {
 		postsLock.Unlock()
@@ -116,16 +124,19 @@ func (post *Post) broadcastNonceUpdate() {
 	newNonce := post.nonce
 	message := append(append([]byte{PacketNonceUpdate}, postPayloadHash[:]...), newNonce[:]...)
 	peersLock.Lock()
+	fmt.Println("Sending nonce update")
 	for _, peer := range peers {
 		go peer.send(message)
 	}
 	peersLock.Unlock()
 }
 func onPostContentsReceived(payloadRaw []byte, nonce [32]byte, peerFrom *Peer) {
+	fmt.Println("Post contents:",payloadRaw)
 	payloadHash := sha256.Sum256(payloadRaw)
 	postsLock.Lock()
 	_, ok := posts[payloadHash]
 	if ok {
+		fmt.Println("Already have it")
 		postsLock.Unlock()
 		//already have it. let's just check if the nonce is better
 		onNonceUpdateReceived(payloadHash, nonce, peerFrom)
@@ -138,7 +149,7 @@ func onPostContentsReceived(payloadRaw []byte, nonce [32]byte, peerFrom *Peer) {
 			firstReceived:         now,
 			mostRecentNonceUpdate: now,
 		}
-		posts[payloadHash] = post
+		posts[payloadHash] = &post
 		postsLock.Unlock()
 		fmt.Println("Added post with payload hash", post.payloadHash(), "and normal hash", post.hash())
 	}
@@ -150,9 +161,10 @@ func onPostContentsRequested(payloadHash [32]byte, peerFrom *Peer) {
 	if ok {
 		payloadLenBytes := make([]byte, 2)
 		binary.LittleEndian.PutUint16(payloadLenBytes, uint16(len(post.payloadRaw)))
-		fmt.Println("Asking for ", payloadHash)
+		fmt.Println("Sending contents of ", payloadHash)
 		//man I wish go was better at appending mulitple arrays. lol im probbaly doing something wrong here. BUT HEY, IT WORKS
 		message := append(append(append([]byte{PacketPostContents}, payloadLenBytes...), post.payloadRaw...), post.nonce[:]...)
+		fmt.Println("data:",message)
 		peerFrom.send(message)
 	} else {
 		//um idk we don't have it. just ignore lol
@@ -189,9 +201,10 @@ func (peer *Peer) listen() error {
 			if err != nil {
 				return err
 			}
-			payloadLen := int16(binary.LittleEndian.Uint16(payloadLenBytes))
+			payloadLen := int(binary.LittleEndian.Uint16(payloadLenBytes))
+			fmt.Println("Reading payload with len",payloadLen)
 			payload := make([]byte, payloadLen)
-			_, err = io.ReadFull(peer.conn, payloadLenBytes)
+			_, err = io.ReadFull(peer.conn, payload)
 			if err != nil {
 				return err
 			}
@@ -259,7 +272,12 @@ func main(){
 	}
 	if *createAndMine{
 		go func(){
-			//do so
+			post:=Post{
+				payloadRaw:[]byte{5,0,2,1},
+			}
+			post.insert()
+			post.mine(20000000)
+
 		}()
 	}
 	listen(*listenPort)//this goes last because it blocks
