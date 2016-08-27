@@ -91,33 +91,33 @@ func (post *Post) mine(count int) {
 func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom *Peer) {
 	postsLock.Lock()
 	post, ok := posts[postPayloadHash]
-	
+
 	if ok {
 		if post.checkPossibleNonce(newNonce) {
-			oldNonce:=post.nonce
+			oldNonce := post.nonce
 			post.nonce = newNonce
 			postsLock.Unlock()
 			fmt.Println("Updating post nonce from", oldNonce[:], "to", newNonce[:])
 			post.broadcastNonceUpdate()
-		}else{
+		} else {
 			postsLock.Unlock()
 		}
 	} else {
 		postsLock.Unlock()
 		//ask the peer we received this from for the contents of the post because we don't have it
-		peerFrom.send(append([]byte{PacketPostContentsRequest},postPayloadHash[:]...))
+		peerFrom.send(append([]byte{PacketPostContentsRequest}, postPayloadHash[:]...))
 	}
 
 }
-func (post *Post) broadcastNonceUpdate(){
-	postPayloadHash:=post.payloadHash()
-	newNonce:=post.nonce
-	message:=append(append([]byte{PacketNonceUpdate},postPayloadHash[:]...),newNonce[:]...)
-			peersLock.Lock()
-			for _,peer:=range peers{
-				go peer.send(message)
-			}
-			peersLock.Unlock()
+func (post *Post) broadcastNonceUpdate() {
+	postPayloadHash := post.payloadHash()
+	newNonce := post.nonce
+	message := append(append([]byte{PacketNonceUpdate}, postPayloadHash[:]...), newNonce[:]...)
+	peersLock.Lock()
+	for _, peer := range peers {
+		go peer.send(message)
+	}
+	peersLock.Unlock()
 }
 func onPostContentsReceived(payloadRaw []byte, nonce [32]byte, peerFrom *Peer) {
 	payloadHash := sha256.Sum256(payloadRaw)
@@ -138,7 +138,7 @@ func onPostContentsReceived(payloadRaw []byte, nonce [32]byte, peerFrom *Peer) {
 		}
 		posts[payloadHash] = post
 		postsLock.Unlock()
-		fmt.Println("Added post with payload hash",post.payloadHash(),"and normal hash",post.hash())
+		fmt.Println("Added post with payload hash", post.payloadHash(), "and normal hash", post.hash())
 	}
 }
 func onPostContentsRequested(payloadHash [32]byte, peerFrom *Peer) {
@@ -146,20 +146,20 @@ func onPostContentsRequested(payloadHash [32]byte, peerFrom *Peer) {
 	post, ok := posts[payloadHash]
 	postsLock.Unlock()
 	if ok {
-		payloadLenBytes:=make([]byte,2)
-		binary.LittleEndian.PutUint16(payloadLenBytes,uint16(len(post.payloadRaw)))
-		fmt.Println("Asking for ",payloadHash)
+		payloadLenBytes := make([]byte, 2)
+		binary.LittleEndian.PutUint16(payloadLenBytes, uint16(len(post.payloadRaw)))
+		fmt.Println("Asking for ", payloadHash)
 		//man I wish go was better at appending mulitple arrays. lol im probbaly doing something wrong here. BUT HEY, IT WORKS
-		message:=append(append(append([]byte{PacketPostContents}, payloadLenBytes...), post.payloadRaw...), post.nonce[:]...)
+		message := append(append(append([]byte{PacketPostContents}, payloadLenBytes...), post.payloadRaw...), post.nonce[:]...)
 		peerFrom.send(message)
 	} else {
 		//um idk we don't have it. just ignore lol
 	}
 }
-func (peer *Peer) send(msg []byte ) error{
+func (peer *Peer) send(msg []byte) error {
 	peer.writeLock.Lock()
 	defer peer.writeLock.Unlock()
-	_,err:= peer.conn.Write(msg)
+	_, err := peer.conn.Write(msg)
 	return err
 }
 func (peer *Peer) listen() error {
@@ -179,7 +179,7 @@ func (peer *Peer) listen() error {
 			if err != nil {
 				return err
 			}
-			fmt.Println("Someone gave us a new nonce",newNonce,"for",payloadHash)
+			fmt.Println("Someone gave us a new nonce", newNonce, "for", payloadHash)
 			go onNonceUpdateReceived(payloadHash, newNonce, peer)
 		case PacketPostContents:
 			payloadLenBytes := make([]byte, 2)
@@ -204,11 +204,11 @@ func (peer *Peer) listen() error {
 			if err != nil {
 				return err
 			}
-			fmt.Println("Someone just asked us for post contents for payload hash",requestedPayloadHash)
+			fmt.Println("Someone just asked us for post contents for payload hash", requestedPayloadHash)
 			go onPostContentsRequested(requestedPayloadHash, peer)
 		default:
 			peer.conn.Close()
-			fmt.Println("Unexpected prefix byte",msgType)
+			fmt.Println("Unexpected prefix byte", msgType)
 		}
 	}
 }
@@ -219,6 +219,5 @@ func read32(conn net.Conn) ([32]byte, error) {
 }
 
 func main() {
-	
 
 }
