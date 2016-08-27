@@ -6,18 +6,20 @@ import (
 	"sync"
 )
 
+// Peer is the managed structure for all connected nodes
 type Peer struct {
-	conn      net.Conn
+	Conn      net.Conn
 	writeLock sync.Mutex
 }
 
 var peers []*Peer
 var peersLock sync.Mutex
 
-func (peer *Peer) send(msg []byte) error {
+// Send writes a message to the conn
+func (peer *Peer) Send(msg []byte) error {
 	peer.writeLock.Lock()
 	defer peer.writeLock.Unlock()
-	_, err := peer.conn.Write(msg)
+	_, err := peer.Conn.Write(msg)
 	return err
 }
 func (peer *Peer) remove() {
@@ -32,10 +34,11 @@ func (peer *Peer) remove() {
 	}
 	fmt.Println("Peer wasn't in list to begin with")
 }
-func addPeer(conn net.Conn) {
-	peer := Peer{conn: conn}
+// AddPeer appends a peer to the peer list
+func AddPeer(conn net.Conn) {
+	peer := Peer{Conn: conn}
 	peersLock.Lock()
 	peers = append(peers, &peer)
 	peersLock.Unlock()
-	go peer.listen()
+	go peer.Listen()
 }

@@ -2,25 +2,60 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"strconv"
 )
 
-func main() {
-	listenPort := flag.Int("listen", -1, "port to listen on")
-	connectPort := flag.Int("connect", -1, "port to connect to")
-	createAndMine := flag.Bool("create", false, "create and mine a post, as a test")
-	flag.Parse()
-	if *connectPort != -1 {
-		connect(*connectPort)
+type IntSliceFlag []int
+
+func (i *IntSliceFlag) String() string {
+	return fmt.Sprintf("%d", *i)
+}
+
+func (i *IntSliceFlag) Set(value string) error {
+	tmp, err := strconv.Atoi(value)
+	if err != nil {
+		return err
 	}
-	if *createAndMine {
+
+	*i = append(*i, tmp)
+	return nil
+}
+
+func main() {
+	var listenPort int
+	var connectPorts IntSliceFlag
+	var createAndMine bool
+
+	flag.IntVar(&listenPort, "listen", 0, "port to listen on")
+	flag.Var(&connectPorts, "connect", "ports to connect to")
+	flag.BoolVar(&createAndMine, "create", false, "create and mine a post, as a test")
+
+	flag.Parse()
+
+	if len(connectPorts) > 0 {
+		for _, port := range connectPorts {
+			err := Connect(port)
+			if err != nil {
+				fmt.Printf("Couldn't connect to peer on port: %v. Error: %v", port, err)
+			}
+		}
+
+	}
+	if createAndMine {
 		go func() {
 			post := Post{
-				payloadRaw: []byte{5, 0, 2, 1},
+				PayloadRaw: []byte{5, 0, 2, 1},
 			}
-			post.insert()
-			post.mine(20000000)
+			post.Insert()
+			post.Mine(20000000)
 
 		}()
 	}
-	listen(*listenPort) //this goes last because it blocks
+
+	// This goes last because it blocks
+	err := Listen(listenPort)
+	if err != nil {
+		panic(err)
+	}
 }
