@@ -195,6 +195,9 @@ func (peer *Peer) listen() error {
 			}
 			fmt.Println("Someone just asked us for post contents for payload hash",requestedPayloadHash)
 			go onPostContentsRequested(requestedPayloadHash, peer)
+		default:
+			peer.conn.Close()
+			fmt.Println("Unexpected prefix byte",msgType)
 		}
 	}
 }
