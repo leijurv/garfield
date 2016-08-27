@@ -35,7 +35,7 @@ type Peer struct {
 var peers []*Peer
 var peersLock sync.Mutex
 
-var posts map[[32]byte]*Post = make(map[[32]byte]*Post)
+var posts = make(map[[32]byte]*Post)
 var postsLock sync.Mutex
 
 func (post *Post) payloadHash() [32]byte {
@@ -231,7 +231,7 @@ func (peer *Peer) listen() error {
 		}
 	}
 }
-func read32(conn net.Conn) ([32]byte, error) {
+func read32(conn io.Reader) ([32]byte, error) {
 	var data [32]byte
 	_, err := io.ReadFull(conn, data[:])
 	return data, err
