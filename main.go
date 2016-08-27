@@ -75,6 +75,7 @@ func (post *Post) mine(count int) {
 		if bytes.Compare(newHash[:], currentHash[:]) < 0 {
 			currentHash = newHash
 			post.nonce = nonce
+			post.mostRecentNonceUpdate = time.Now()
 			fmt.Println("Nonce improvement, hash is now ", newHash)
 			post.broadcastNonceUpdate()
 		}
@@ -101,6 +102,7 @@ func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom
 		if comparison < 0 {
 			oldNonce := post.nonce
 			post.nonce = newNonce
+			post.mostRecentNonceUpdate = time.Now()
 			postsLock.Unlock()
 			fmt.Println("Updating post nonce from", oldNonce[:], "to", newNonce[:])
 			post.broadcastNonceUpdate()
