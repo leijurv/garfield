@@ -95,9 +95,10 @@ func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom
 	
 	if ok {
 		if post.checkPossibleNonce(newNonce) {
+			oldNonce:=post.nonce
 			post.nonce = newNonce
 			postsLock.Unlock()
-			fmt.Println("Updating post nonce from", hex.EncodeToString(post.nonce[:]), "to", hex.EncodeToString(newNonce[:]))
+			fmt.Println("Updating post nonce from", oldNonce[:], "to", newNonce[:])
 			//send out update here
 		}else{
 			postsLock.Unlock()
