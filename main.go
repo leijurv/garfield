@@ -38,15 +38,6 @@ func (post *Post) checkPossibleNonce(newNonce [32]byte) bool {
 	}
 	return false
 }
-func increment(nonce [32]byte) [32]byte {
-	for i := 31; i >= 0; i-- {
-		nonce[i]++
-		if nonce[i] != 0 {
-			break
-		}
-	}
-	return nonce
-}
 func randomNonce() [32]byte {
 	rand.Seed(time.Now().UTC().UnixNano())
 	fixedLengthIsBS := make([]byte, 32)
@@ -65,7 +56,18 @@ func (post *Post) mine(count int) {
 			post.nonce = nonce
 			fmt.Println("Nonce improvement, hash is now ", newHash)
 		}
-		nonce = increment(nonce)
+		nonce[31]++
+		if nonce[31] == 0 {
+			nonce[30]++
+			if nonce[30] == 0 {
+				for i := 29; i >= 0; i-- {
+					nonce[i]++
+					if nonce[i] != 0 {
+						break
+					}
+				}
+			}
+		}
 	}
 }
 func (post *Post) onNewNonceReceived(newNonce [32]byte) {
