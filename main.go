@@ -3,22 +3,17 @@ package main
 import (
 	"flag"
 	"fmt"
-	"strconv"
 )
 
-type IntSliceFlag []int
+type IntSliceFlag []string
 
 func (i *IntSliceFlag) String() string {
 	return fmt.Sprintf("%d", *i)
 }
 
 func (i *IntSliceFlag) Set(value string) error {
-	tmp, err := strconv.Atoi(value)
-	if err != nil {
-		return err
-	}
 
-	*i = append(*i, tmp)
+	*i = append(*i, value)
 	return nil
 }
 

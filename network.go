@@ -70,9 +70,9 @@ func Listen(port int) error {
 }
 
 // Connect connects and adds a peer
-func Connect(port int) error {
+func Connect(port string) error {
 	fmt.Println("Connecting to", port)
-	conn, err := net.Dial("tcp", "localhost:"+strconv.Itoa(port))
+	conn, err := net.Dial("tcp", port)
 	if err != nil {
 		return err
 	}
