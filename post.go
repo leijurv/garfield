@@ -50,6 +50,7 @@ func (post *Post) Insert() {
 	postsLock.Lock()
 	posts[post.PayloadHash()] = post
 	postsLock.Unlock()
+	saveNewPost(post)
 }
 
 // Mine does something
@@ -61,8 +62,7 @@ func (post *Post) Mine(count int) {
 		if bytes.Compare(newHash[:], currentHash[:]) < 0 {
 			currentHash = newHash
 			postsLock.Lock()
-			post.nonce = nonce
-			post.mostRecentNonceUpdate = time.Now()
+			post.updateNonce(nonce)
 			postsLock.Unlock()
 			fmt.Println("Nonce improvement, hash is now ", newHash)
 			post.BroadcastNonceUpdate()
@@ -80,6 +80,12 @@ func (post *Post) Mine(count int) {
 			}
 		}
 	}
+}
+
+func (post *Post) updateNonce(newNonce [32]byte){
+	post.nonce = newNonce
+	post.mostRecentNonceUpdate = time.Now()
+	saveNonceUpdate(post)
 }
 
 // BroadcastNonceUpdate sends out the update to all peers

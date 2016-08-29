@@ -22,8 +22,7 @@ func onNonceUpdateReceived(postPayloadHash [32]byte, newNonce [32]byte, peerFrom
 		comparison := post.CheckPossibleNonce(newNonce)
 		if comparison < 0 {
 			oldNonce := post.nonce
-			post.nonce = newNonce
-			post.mostRecentNonceUpdate = time.Now()
+			post.updateNonce(newNonce)
 			postsLock.Unlock()
 			fmt.Println("Updating post nonce from", oldNonce[:], "to", newNonce[:], ". Post hash is now", post.Hash())
 			post.BroadcastNonceUpdate()
