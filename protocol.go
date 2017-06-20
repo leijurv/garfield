@@ -179,8 +179,7 @@ func onGetNonce(payloadHash PayloadHash, peer *Peer) error {
 }
 func onPacketMultiNonce(payloadHash PayloadHash, nonces []Nonce, meta Meta, peer *Peer) error {
 	post := genPost(payloadHash, nonces, meta)
-
-	if post.Acceptable() {
+	if post.Acceptable() { //genPost inserts all these awesome nonces and works where they should go. now we can check if the score is acceptable
 		message := []byte{uint8(PacketPayloadRequest)}
 		message = append(message, payloadHash[:]...)
 		fmt.Println("data:", message)
@@ -188,7 +187,8 @@ func onPacketMultiNonce(payloadHash PayloadHash, nonces []Nonce, meta Meta, peer
 		if err != nil {
 			return err
 		}
+		return nil
+	} else {
+		return nil
 	}
-	return nil
-	//huehuehue just call readPacketNonceUpdate in a loop
 }
