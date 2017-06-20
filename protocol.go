@@ -22,8 +22,7 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 	if len(meta.raw) > 255 {
 		panic("not long enough")
 	}
-	message = append(message, uint8(len(meta.raw)))
-	message = append(message, meta.raw...)
+	message = append(message, meta.Write()...)
 	//TODO verify minimum depth before processing any further, and certainly before relaying!!!!!
 	if !meta.Verify() { //we don't care
 		if tiene&FlagHasNonces == 0 {
@@ -135,11 +134,7 @@ func onPayloadRequested(payloadHash PayloadHash, peerFrom *Peer) error {
 
 	message := []byte{uint8(PacketPayload)}
 	message = append(message, payloadHash[:]...)
-	if len(post.Meta.raw) > 255 {
-		panic("not long enough")
-	}
-	message = append(message, uint8(len(post.Meta.raw)))
-	message = append(message, post.Meta.raw...)
+	message = append(message, post.Meta.Write()...)
 	payloadLenBytes := make([]byte, 2)
 	binary.LittleEndian.PutUint16(payloadLenBytes, uint16(len(*post.Payload)))
 	message = append(message, payloadLenBytes...)
@@ -159,11 +154,8 @@ func onGetNonce(payloadHash PayloadHash, peer *Peer) error {
 	}
 	message := []byte{uint8(PacketMultiNonce)}
 	message = append(message, payloadHash[:]...)
-	if len(post.Meta.raw) > 255 {
-		panic("not long enough")
-	}
-	message = append(message, uint8(len(post.Meta.raw)))
-	message = append(message, post.Meta.raw...)
+
+	message = append(message, post.Meta.Write()...)
 
 	nonces := post.FlattenNonces()
 	if len(nonces) > 65535 {
