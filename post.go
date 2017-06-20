@@ -158,7 +158,7 @@ func (post *Post) insertIfImprovement(nonce Nonce) bool { //this func only retur
 			fmt.Println("Replacing", post.work[depth][index][:], "with lower", newWork[:])
 			chk1, _ := calcDepth(post.work[depth][index])
 			chk2, _ := calcDepth(newWork)
-			if chk1 != chk2 {
+			if chk1 != chk2 || chk1 != depth || chk2 != depth {
 				panic("how on earth did this happen")
 			}
 			post.work[depth][index] = newWork
