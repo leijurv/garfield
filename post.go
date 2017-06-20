@@ -9,8 +9,6 @@ import (
 	"encoding/hex"
 )
 
-const minWorkHex = 5
-
 type Nonce [32]byte
 
 type Nonces [][]Nonce
@@ -133,7 +131,8 @@ func genPost(payloadHash PayloadHash, nonces []Nonce, meta Meta) *Post {
 func (post *Post) insertIfImprovement(nonce Nonce) bool { //this func only returns whether or not it actually improved, doesn't do anything else like rebroadcasting or saving
 	post.lock.Lock()
 	defer post.lock.Unlock()
-	verifySanity(post.Nonces, post.work)
+	post.verify()
+	defer post.verify() //rerun afterwards to make sure we didn't mess up anything
 	_, newWork := post.PayloadHash.Sentiment(nonce)
 	depth, ok := calcDepth(newWork)
 	if !ok {
@@ -163,9 +162,9 @@ func (post *Post) insertIfImprovement(nonce Nonce) bool { //this func only retur
 			}
 			post.work[depth][index] = newWork
 			post.Nonces[depth][index] = nonce
-			return true //don't replace multiple things with this, only the first one
-			//TODO TODO TODO replace only the one that would result in the greatest improvement
+			return true
 		}
+		//if we can't improve on the worst at this depth, then fail
 		return false
 	} else {
 		post.work[depth] = append(post.work[depth], newWork)
@@ -173,6 +172,9 @@ func (post *Post) insertIfImprovement(nonce Nonce) bool { //this func only retur
 		return true
 	}
 
+}
+func (post *Post) verify() {
+	verifySanity(post.Nonces, post.work)
 }
 func verifySanity(nonces Nonces, work Work) { //only call with lock, obviously
 	if len(nonces) != len(work) {
@@ -188,9 +190,19 @@ func verifySanity(nonces Nonces, work Work) { //only call with lock, obviously
 		if len(nonces[i]) == 0 {
 			panic("INSANE")
 		}
+		for j := 0; j < len(nonces[i]); j++ {
+			depth, ok := calcDepth(work[i][j])
+			if !ok {
+				panic("INSANE")
+			}
+			if depth != i {
+				panic("INSANE")
+			}
+		}
 	}
 }
 func calcDepth(work [32]byte) (int, bool) { //forgive me
+	const minWorkHex = 5
 	str := hex.EncodeToString(work[:])
 	if len(str) != 64 {
 		panic("wtf")
