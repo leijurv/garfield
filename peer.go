@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"sync"
 )
@@ -32,45 +33,49 @@ func (peer *Peer) remove() {
 			return
 		}
 	}
-	fmt.Println("Peer wasn't in list to begin with")
+	panic("Peer wasn't in list to begin with")
 }
+
 // AddPeer appends a peer to the peer list
 func AddPeer(conn net.Conn) {
 	peer := Peer{Conn: conn}
 	peersLock.Lock()
+	defer peersLock.Unlock()
 	peers = append(peers, &peer)
-	peersLock.Unlock()
-	go peer.Listen()
+
+	go func() {
+		err := peer.Listen()
+		fmt.Println("Disconnected beacuse of", err)
+	}()
+}
+func Broadcast(data []byte) {
+	peersLock.Lock()
+	defer peersLock.Unlock()
+	for i := 0; i < len(peers); i++ {
+		peer := peers[i]
+		go peer.Send(data)
+	}
 }
 
 // Listen starts a listener for notifications to that peer
 func (peer *Peer) Listen() error {
 	defer peer.Conn.Close()
 	defer peer.remove()
+	msgType := make([]byte, 1)
 	for {
-		msgType := make([]byte, 1)
-		_, err := peer.Conn.Read(msgType)
+		_, err := io.ReadFull(peer.Conn, msgType)
 		if err != nil {
 			return err
 		}
-		switch msgType[0] {
-		case PacketNonceUpdate:
-			err := readPacketNonceUpdate(peer)
-			if err != nil {
-				return err
-			}
-		case PacketPostContents:
-			err := readPacketPostContents(peer)
-			if err != nil {
-				return err
-			}
-		case PacketPostContentsRequest:
-			err := readPacketPostContentsRequest(peer)
-			if err != nil {
-				return err
-			}
-		default:
+		packetType := PacketType(msgType[0])
+		handle, ok := packetHandlers[packetType]
+		if !ok || handle == nil {
 			return fmt.Errorf("Unexpected prefix byte %d", int(msgType[0]))
 		}
+		err = handle(peer)
+		if err != nil {
+			return err
+		}
+
 	}
 }

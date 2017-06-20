@@ -18,6 +18,9 @@ func (i *IntSliceFlag) Set(value string) error {
 }
 
 func main() {
+	fmt.Println(HasPayload)
+	fmt.Println(HasNonces)
+	fmt.Println(Cats)
 	var listenPort int
 	var connectPorts IntSliceFlag
 	var createAndMine bool
@@ -37,7 +40,7 @@ func main() {
 		}
 
 	}
-	if createAndMine {
+	/*if createAndMine {
 		go func() {
 			post := Post{
 				PayloadRaw: []byte{5, 0, 2, 1},
@@ -46,7 +49,7 @@ func main() {
 			post.Mine(20000000)
 
 		}()
-	}
+	}*/
 
 	// This goes last because it blocks
 	err := Listen(listenPort)
