@@ -29,12 +29,16 @@ type Post struct {
 
 type Meta struct {
 	raw  []byte
-	Data map[string]interface{}
+	data map[string]interface{}
 }
 
 var requestedPosts map[PayloadHash]*Post
 var reqLock sync.Mutex
 
+func (meta Meta) GetData(key string) (interface{}, bool) {
+	a, b := meta.data[key] //I wish I could do return meta.data[key] but go is stupid =(
+	return a, b
+}
 func getReq(payloadHash PayloadHash) *Post {
 	reqLock.Lock()
 	defer reqLock.Unlock()
@@ -49,7 +53,7 @@ func GetPost(payloadHash PayloadHash) *Post {
 	if post != nil {
 		return post
 	}
-	//TODO
+	//TODO check disk
 	return nil
 }
 func (meta Meta) Verify() bool {
@@ -81,12 +85,11 @@ func (payload Payload) BodyHash() [32]byte {
 	return sha256.Sum256(payload)
 }
 func (post *Post) PayloadBodyHash() [32]byte {
-	if !post.HasPayload() {
-		panic("HEY")
-	}
 	return post.Payload.BodyHash()
 }
 func (post *Post) FlattenNonces() []Nonce {
+	post.lock.Lock()
+	defer post.lock.Unlock()
 	count := 0
 	for i := 0; i < len(post.Nonces); i++ {
 		count += len(post.Nonces[i])
@@ -105,6 +108,8 @@ func (post *Post) HasPayload() bool {
 	return post.Payload != nil
 }
 func (post *Post) payloadReceived(payload Payload) {
+	post.lock.Lock()
+	defer post.lock.Unlock()
 	if post.HasPayload() {
 		return
 	}
@@ -163,6 +168,8 @@ func genPost(payloadHash PayloadHash, nonces []Nonce, meta Meta) *Post {
 	return post
 }
 func (post *Post) insertIfImprovement(nonce Nonce) bool {
+	post.lock.Lock()
+	defer post.lock.Unlock()
 	return true
 }
 

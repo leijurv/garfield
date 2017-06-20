@@ -18,9 +18,11 @@ func (i *IntSliceFlag) Set(value string) error {
 }
 
 func main() {
-	fmt.Println(HasPayload)
-	fmt.Println(HasNonces)
-	fmt.Println(Cats)
+	fmt.Println(FlagHasPayload)
+	fmt.Println(FlagHasNonces)
+	fmt.Println(FlagAcceptableScore)
+
+	fmt.Println(FlagAcceptableMeta)
 	var listenPort int
 	var connectPorts IntSliceFlag
 	var createAndMine bool

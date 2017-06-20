@@ -14,7 +14,7 @@ func read32(conn io.Reader) ([32]byte, error) {
 }
 
 func randomNonce() [32]byte {
-	nr := rand.New(rand.NewSource(time.Now().UTC().UnixNano()))
+	nr := rand.New(rand.NewSource(time.Now().UTC().UnixNano())) //TODO this is honestly terrible but thankfully it doesn't need to be cryptographically secure, it's just a starting point for the miner
 	fixedLengthIsBS := make([]byte, 32)
 	nr.Read(fixedLengthIsBS)
 
@@ -37,7 +37,7 @@ func readMeta(peer *Peer) (*Meta, error) {
 		return nil, err
 	}
 	meta := Meta{raw: metaBytes}
-	err = json.Unmarshal(metaBytes, &(meta.Data))
+	err = json.Unmarshal(metaBytes, &(meta.data))
 	if err != nil {
 		return nil, err
 	}

@@ -29,11 +29,17 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 		if tiene&FlagHasNonces == 0 {
 			//we just received from someone who also doesn't know what they are doing
 			//if we rebroadcast, it will go back to them with the same flags, and we will have an infinite loop
-			//so,
+			if tiene&FlagAcceptableMeta != 0 {
+				//they do like the meta though.
+				//TODO do something here
+				return nil
+			} else {
+				return nil //they don't have the nonces, and in fact don't care, and we also don't care. lol
+			}
 		}
 		var flags uint8
 		post := GetPost(postPayloadHash)
-		if post != nil && post.HasPayload() {
+		if post != nil && post.HasPayload() { //why check payload? because maybe the meta used to be acceptable but now isn't, but we still have the payload from earlier I guess
 			//don't set HasNonces because we aren't keeping track of the nonces so it would be deceiving
 			flags |= FlagHasPayload
 		}
@@ -60,6 +66,7 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 			return nil
 		} else {
 			//this was not an improvement. so, useless
+			return nil
 		}
 	} else {
 		//TODO honestly maybe just broadcast a getnonce to EVERY peer...

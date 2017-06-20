@@ -10,3 +10,6 @@ func saveNewPost(post *Post) {
 func saveNonceUpdate(post *Post) {
 	fmt.Println("SAVING NONCE UPDATE FOR POST WITH PAYLOAD HASH", post.PayloadHash)
 }
+func initializeFreight() {
+
+}
