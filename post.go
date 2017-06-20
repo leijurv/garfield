@@ -3,20 +3,19 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
-	//"fmt"
+	"fmt"
 	"sync"
 	//"time"
+	"encoding/hex"
 )
 
-type PayloadHash [32]byte
+const minWorkHex = 5
 
 type Nonce [32]byte
 
 type Nonces [][]Nonce
 
 type Work [][][32]byte
-
-type Payload []byte
 
 type Post struct {
 	PayloadHash PayloadHash
@@ -27,22 +26,13 @@ type Post struct {
 	lock        sync.Mutex
 }
 
-type Meta struct {
-	raw  []byte
-	data map[string]interface{}
-}
+var posts map[PayloadHash]*Post
+var postsLock sync.Mutex
 
-var requestedPosts map[PayloadHash]*Post
-var reqLock sync.Mutex
-
-func (meta Meta) GetData(key string) (interface{}, bool) {
-	a, b := meta.data[key] //I wish I could do return meta.data[key] but go is stupid =(
-	return a, b
-}
 func getReq(payloadHash PayloadHash) *Post {
-	reqLock.Lock()
-	defer reqLock.Unlock()
-	post, ok := requestedPosts[payloadHash]
+	postsLock.Lock()
+	defer postsLock.Unlock()
+	post, ok := posts[payloadHash]
 	if !ok {
 		return nil
 	}
@@ -56,34 +46,7 @@ func GetPost(payloadHash PayloadHash) *Post {
 	//TODO check disk
 	return nil
 }
-func (meta Meta) Verify() bool {
-	//TODO
-	return true
-}
-func (hash PayloadHash) Sentiment(nonce Nonce) (bool, [32]byte) {
-	positive := hash.Work(nonce, true)
-	negative := hash.Work(nonce, false)
-	if bytes.Compare(positive[:], negative[:]) < 0 { //return true if positive is less than negative
-		return true, positive
-	} else {
-		return false, negative
-	}
-}
 
-func (hash PayloadHash) Work(nonce Nonce, sentiment bool) [32]byte { // hash(hash(hash(payolad)+"up")+nonce)
-	var sent []byte
-	if sentiment {
-		sent = []byte("up")
-	} else {
-		sent = []byte("down")
-	}
-	tmp := sha256.Sum256(append(hash[:], sent...))
-	res := sha256.Sum256(append(tmp[:], nonce[:]...))
-	return res
-}
-func (payload Payload) BodyHash() [32]byte {
-	return sha256.Sum256(payload)
-}
 func (post *Post) PayloadBodyHash() [32]byte {
 	return post.Payload.BodyHash()
 }
@@ -150,27 +113,97 @@ func genPost(payloadHash PayloadHash, nonces []Nonce, meta Meta) *Post {
 	if !meta.Verify() {
 		panic("no")
 	}
-	reqLock.Lock()
-	defer reqLock.Unlock()
+	postsLock.Lock()
+	defer postsLock.Unlock()
 
-	post, ok := requestedPosts[payloadHash]
+	post, ok := posts[payloadHash]
 	if !ok {
 		post := &Post{
 			PayloadHash: payloadHash,
 			Meta:        meta,
 			Payload:     nil,
 		}
-		requestedPosts[payloadHash] = post
+		posts[payloadHash] = post
 	}
 	for i := 0; i < len(nonces); i++ {
 		post.insertIfImprovement(nonces[i])
 	}
 	return post
 }
-func (post *Post) insertIfImprovement(nonce Nonce) bool {
+func (post *Post) insertIfImprovement(nonce Nonce) bool { //this func only returns whether or not it actually improved, doesn't do anything else like rebroadcasting or saving
 	post.lock.Lock()
 	defer post.lock.Unlock()
-	return true
+	verifySanity(post.Nonces, post.work)
+	_, newWork := post.PayloadHash.Sentiment(nonce)
+	depth, ok := calcDepth(newWork)
+	if !ok {
+		return false //TODO maybe return an error this is dumb it doesn't even satisfy minimum depth so its malicious maybe
+	}
+	for len(post.Nonces) <= depth { //we don't already have any at this depth, this'll be the first =D
+		post.Nonces = append(post.Nonces, make([]Nonce, 0))
+		post.work = append(post.work, make([][32]byte, 0))
+	}
+	if len(post.work[depth]) == 16 {
+		worstWork := post.work[depth][0]
+		index := 0
+		for i := 1; i < 16; i++ {
+			if bytes.Compare(worstWork[:], post.work[depth][i][:]) < 0 {
+				worstWork = post.work[depth][i]
+				index = i
+			}
+		}
+		//get the WORST one we currently have. replacing that one with the better option will result in the most improvement, and will maintain the invariant of the 16 best at this depth
+		if bytes.Compare(newWork[:], post.work[depth][index][:]) < 0 {
+			//ding ding we have a winner
+			fmt.Println("Replacing", post.work[depth][index][:], "with lower", newWork[:])
+			chk1, _ := calcDepth(post.work[depth][index])
+			chk2, _ := calcDepth(newWork)
+			if chk1 != chk2 {
+				panic("how on earth did this happen")
+			}
+			post.work[depth][index] = newWork
+			post.Nonces[depth][index] = nonce
+			return true //don't replace multiple things with this, only the first one
+			//TODO TODO TODO replace only the one that would result in the greatest improvement
+		}
+		return false
+	} else {
+		post.work[depth] = append(post.work[depth], newWork)
+		post.Nonces[depth] = append(post.Nonces[depth], nonce)
+		return true
+	}
+
+}
+func verifySanity(nonces Nonces, work Work) { //only call with lock, obviously
+	if len(nonces) != len(work) {
+		panic("INSANE")
+	}
+	for i := 0; i < len(nonces); i++ {
+		if len(nonces[i]) != len(work[i]) {
+			panic("INSANE")
+		}
+		if len(nonces[i]) > 16 {
+			panic("INSANE")
+		}
+		if len(nonces[i]) == 0 {
+			panic("INSANE")
+		}
+	}
+}
+func calcDepth(work [32]byte) (int, bool) { //forgive me
+	str := hex.EncodeToString(work[:])
+	if len(str) != 64 {
+		panic("wtf")
+	}
+	pos := 0
+	for str[pos] == '0' {
+		pos++
+	}
+	depth := pos - minWorkHex - 1
+	if depth < 0 {
+		return -1, false
+	}
+	return depth, true
 }
 
 // CheckPossibleNonce compares the new nonce hash with the old one

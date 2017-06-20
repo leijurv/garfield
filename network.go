@@ -30,18 +30,15 @@ func readPacketNonceUpdate(peer *Peer) error {
 		return err
 	}
 	tiene := tieneBytes[0]
-	onNonceUpdateReceived(payloadHash, *meta, nonce, tiene, peer)
-	return nil
+	return onNonceUpdateReceived(payloadHash, *meta, nonce, tiene, peer)
 }
 func readPacketPayloadRequest(peer *Peer) error {
 	payloadHash, err := read32(peer.Conn)
 	if err != nil {
 		return err
 	}
-	onPayloadRequested(payloadHash, peer)
-	return nil
+	return onPayloadRequested(payloadHash, peer)
 }
-
 func readPacketPayload(peer *Peer) error {
 	payloadHash, err := read32(peer.Conn)
 	if err != nil {
@@ -71,16 +68,14 @@ func readPacketPayload(peer *Peer) error {
 	if err != nil {
 		return err
 	}
-	onPayloadReceived(payloadHash, *meta, payloadBodyHash, payload)
-	return nil
+	return onPayloadReceived(payloadHash, *meta, payloadBodyHash, payload)
 }
 func readPacketGetNonce(peer *Peer) error {
 	payloadHash, err := read32(peer.Conn)
 	if err != nil {
 		return err
 	}
-	onGetNonce(payloadHash, peer)
-	return nil
+	return onGetNonce(payloadHash, peer)
 }
 func readPacketMultiNonce(peer *Peer) error {
 	payloadHash, err := read32(peer.Conn)
@@ -105,8 +100,7 @@ func readPacketMultiNonce(peer *Peer) error {
 		}
 		nonces[i] = nonce
 	}
-	onPacketMultiNonce(payloadHash, nonces, *meta, peer)
-	return nil
+	return onPacketMultiNonce(payloadHash, nonces, *meta, peer)
 }
 
 // Listen is the listener port to get notifications

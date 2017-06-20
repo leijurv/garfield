@@ -24,18 +24,21 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 	}
 	message = append(message, uint8(len(meta.raw)))
 	message = append(message, meta.raw...)
-	if !meta.Verify() {
-		//we don't care
+	//TODO verify minimum depth before processing any further, and certainly before relaying!!!!!
+	if !meta.Verify() { //we don't care
 		if tiene&FlagHasNonces == 0 {
 			//we just received from someone who also doesn't know what they are doing
 			//if we rebroadcast, it will go back to them with the same flags, and we will have an infinite loop
 			if tiene&FlagAcceptableMeta != 0 {
-				//they do like the meta though.
-				//TODO do something here
+				//they do like the meta though
+				//hopefully they will have the nonces soon because they like the meta
+				//let's not put any effort into trying to get these nonces because, we, don't, care
 				return nil
 			} else {
 				return nil //they don't have the nonces, and in fact don't care, and we also don't care. lol
+				//hmmmmm, bad peer! you're not supposed to rebroadcast if you don't have nonces or meta... UNLESS you received from someone with nonces AND meta
 			}
+			return nil
 		}
 		var flags uint8
 		post := GetPost(postPayloadHash)
@@ -79,7 +82,7 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 			fmt.Println("data:", message)
 			err := peer.Send(message)
 			if err != nil {
-				return err
+				return err //this error gets passed all the way back up through the packet handler to peer.Listen, so if writing to this peer fails, we will actually disconnect and remove them
 			}
 		} else {
 			//this peer was just relaying, they don't have the nonces
@@ -95,6 +98,8 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 				//TODO wait 60 seconds then ask them again for the nonces. muahahahhahha
 			} else {
 				//well. we like the meta. we don't have the nonces. we received from someone who doesn't have the nonces and actually doesn't care about the post at all.
+				//solution: don't do anything
+				//if we have at least one other peer who cares, we'll get the same update from them
 				//TODO broadcast a getnonce to everyone lol
 			}
 		}
@@ -104,7 +109,7 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 	return nil
 }
 
-func onPayloadReceived(payloadHash PayloadHash, meta Meta, payloadBodyHash [32]byte, payloadBody Payload) {
+func onPayloadReceived(payloadHash PayloadHash, meta Meta, payloadBodyHash [32]byte, payloadBody Payload) error {
 	fmt.Println("Post contents:", payloadBody)
 	post := GetPost(payloadHash)
 	if post != nil {
@@ -113,6 +118,7 @@ func onPayloadReceived(payloadHash PayloadHash, meta Meta, payloadBodyHash [32]b
 	} else {
 		fmt.Println("While appreciated, I did not ask for contents of", payloadHash, "so I don't have its nonces so I can't accept it")
 	}
+	return nil
 }
 func onPayloadRequested(payloadHash PayloadHash, peerFrom *Peer) error {
 	//TODO pow

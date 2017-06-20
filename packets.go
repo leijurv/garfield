@@ -12,7 +12,7 @@ const (
 )
 
 var packetHandlers = map[PacketType]func(*Peer) error{
-	PacketNonceUpdate:    readPacketMultiNonce,
+	PacketNonceUpdate:    readPacketMultiNonce, //these are defined in network.go and all have the same signature of func(*Peer) error
 	PacketPayload:        readPacketPayload,
 	PacketPayloadRequest: readPacketPayloadRequest,
 	PacketGetNonce:       readPacketGetNonce,
