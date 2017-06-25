@@ -89,10 +89,11 @@ func (post *Post) AcceptableScore() bool {
 func (post *Post) Acceptable() bool {
 	return post.Meta.Verify() && post.AcceptableScore()
 }
-func (post *Post) Score() int64 {
+func (post *Post) Scores() (*big.Float, *big.Float) {
 	post.lock.Lock()
 	defer post.lock.Unlock()
-	score := new(big.Float)
+	score5021 := new(big.Float)
+	score1738 := new(big.Float)
 	max := new(big.Float)
 	max, _ = max.SetString("115792089237316195423570985008687907853269984665640564039457584007913129634915")
 	for i := 0; i < len(post.work); i++ {
@@ -100,10 +101,20 @@ func (post *Post) Score() int64 {
 			workInt := new(big.Int).SetBytes(post.work[i][j][:])
 			workFloat := new(big.Float).SetInt(workInt)
 			quo := new(big.Float).Quo(max, workFloat)
-			score = new(big.Float).Add(score, quo)
+			sent, _ := post.PayloadHash.Sentiment(post.Nonces[i][j])
+			if sent {
+				score5021 = new(big.Float).Add(score5021, quo)
+			} else {
+				score1738 = new(big.Float).Add(score1738, quo)
+			}
 		}
 	}
-	intScore, _ := score.Int(new(big.Int))
+	return score5021, score1738
+}
+func (post *Post) Score() int64 {
+	good, bad := post.Scores()
+	totalWork := new(big.Float).Add(good, bad)
+	intScore, _ := totalWork.Int(new(big.Int))
 	return intScore.Int64()
 }
 func genPost(payloadHash PayloadHash, nonces []Nonce, meta Meta) *Post {
