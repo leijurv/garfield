@@ -52,7 +52,7 @@ func (post *Post) FlattenNonces() []Nonce {
 	return res
 }
 func (post *Post) HasPayload() bool {
-	return post.Payload != nil
+	return postManager.PayloadBacking.HasPayload(post.PayloadHash)
 }
 func (post *Post) payloadReceived(payload Payload) {
 	post.lock.Lock()
