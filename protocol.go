@@ -22,7 +22,7 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 	_, ok := calcDepth(newWork)
 	if !ok {
 		//we just received a nonce update resulting in work less than minimum depth
-		return errors.New("stop lying to me")
+		return PeerRemovalError{errors.New("stop lying to me")}
 	}
 
 	_, already := dedup[newNonce] //once we know that the pow is acceptable, let's check if we've already seen this nonce
