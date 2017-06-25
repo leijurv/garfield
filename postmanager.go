@@ -19,6 +19,7 @@ type PostManager struct {
 
 type PayloadCache interface {
 	GetPayload(PayloadHash) (*Payload, error)
+	HasPayload(PayloadHash) bool
 	WritePayload(PayloadHash, *Payload) error
 }
 
@@ -76,6 +77,13 @@ func (cache *MemoryPayloadCache) GetPayload(hash PayloadHash) (*Payload, error) 
 		return nil, ErrPayloadMissing
 	}
 	return payload, nil
+}
+
+func (cache *MemoryPayloadCache) HasPayload(hash PayloadHash) bool {
+	cache.Lock.RLock()
+	defer cache.Lock.RUnlock()
+	_, ok := cache.Content[hash]
+	return ok
 }
 
 func (cache *MemoryPayloadCache) WritePayload(hash PayloadHash, payload *Payload) error {
