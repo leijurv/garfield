@@ -18,7 +18,7 @@ type Nonces [][]Nonce
 type Work [][][32]byte
 
 type PostManager struct {
-	Lookup map[PayloadHash]*Post
+	Lookup  map[PayloadHash]*Post
 	Backing PayloadCache
 }
 

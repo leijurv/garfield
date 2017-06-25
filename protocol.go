@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	//"time"
+	"errors"
 )
 
 const (
@@ -14,7 +15,23 @@ const (
 	FlagAcceptableMeta
 )
 
+var dedup map[Nonce]bool
+
 func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonce, tiene byte, peer *Peer) error {
+	//TODO maybe send payloadBodyHash + meta instead of postPayloadHash
+	_, newWork := postPayloadHash.Sentiment(newNonce)
+	_, ok := calcDepth(newWork)
+	if !ok {
+		//we just received a nonce update resulting in work less than minimum depth
+		return errors.New("stop lying to me")
+	}
+
+	_, already := dedup[newNonce] //once we know that the pow is acceptable, let's check if we've already seen this nonce
+	dedup[newNonce] = true
+	if already {
+		return nil
+	}
+
 	message := []byte{uint8(PacketNonceUpdate)}
 	message = append(message, postPayloadHash[:]...)
 	message = append(message, newNonce[:]...)
@@ -23,7 +40,7 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 		panic("not long enough")
 	}
 	message = append(message, meta.Write()...)
-	//TODO verify minimum depth before processing any further, and certainly before relaying!!!!!
+
 	if !meta.Verify() { //we don't care
 		if tiene&FlagHasNonces == 0 {
 			//we just received from someone who also doesn't know what they are doing
@@ -102,9 +119,7 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 				//TODO broadcast a getnonce to everyone lol
 			}
 		}
-
 	}
-
 	return nil
 }
 
