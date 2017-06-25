@@ -15,7 +15,6 @@ var (
 	warningOut = os.Stdout
 	// errorOut redirects error logs to os.Stderr
 	errorOut = os.Stderr
-
 )
 
 type IntSliceFlag []string

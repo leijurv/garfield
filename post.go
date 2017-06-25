@@ -6,6 +6,7 @@ import (
 	"sync"
 	//"time"
 	"encoding/hex"
+	"math/big"
 )
 
 const bucketSize = 16
@@ -25,7 +26,7 @@ type Post struct {
 
 var (
 	postManager = &PostManager{
-		PostBacking: &MemoryPostCache{},
+		PostBacking:    &MemoryPostCache{},
 		PayloadBacking: &MemoryPayloadCache{},
 	}
 )
@@ -88,9 +89,22 @@ func (post *Post) AcceptableScore() bool {
 func (post *Post) Acceptable() bool {
 	return post.Meta.Verify() && post.AcceptableScore()
 }
-func (post *Post) Score() int {
-	//TODO
-	return 0
+func (post *Post) Score() int64 {
+	post.lock.Lock()
+	defer post.lock.Unlock()
+	score := new(big.Float)
+	max := new(big.Float)
+	max, _ = max.SetString("115792089237316195423570985008687907853269984665640564039457584007913129634915")
+	for i := 0; i < len(post.work); i++ {
+		for j := 0; j < len(post.work[i]); j++ {
+			workInt := new(big.Int).SetBytes(post.work[i][j][:])
+			workFloat := new(big.Float).SetInt(workInt)
+			quo := new(big.Float).Quo(max, workFloat)
+			score = new(big.Float).Add(score, quo)
+		}
+	}
+	intScore, _ := score.Int(new(big.Int))
+	return intScore.Int64()
 }
 func genPost(payloadHash PayloadHash, nonces []Nonce, meta Meta) *Post {
 	if !meta.Verify() {

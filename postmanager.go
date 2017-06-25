@@ -1,12 +1,12 @@
 package main
 
 import (
-	"sync"
 	"errors"
+	"sync"
 )
 
 var (
-	ErrPayloadExists error = errors.New("payloadcache: writing payload that already exists")
+	ErrPayloadExists  error = errors.New("payloadcache: writing payload that already exists")
 	ErrPayloadMissing error = errors.New("payloadcache: fetching payload that does not exist")
 
 	ErrPostMissing error = errors.New("postcache: fetching post that does not exist")
@@ -14,7 +14,7 @@ var (
 
 type PostManager struct {
 	PayloadBacking PayloadCache
-	PostBacking PostCache
+	PostBacking    PostCache
 }
 
 type PayloadCache interface {
@@ -42,7 +42,7 @@ func (manager *PostManager) FetchPayload(post *Post) error {
 }
 
 type MemoryPostCache struct {
-	Lock sync.RWMutex
+	Lock    sync.RWMutex
 	Content map[PayloadHash]*Post
 }
 
@@ -64,7 +64,7 @@ func (cache *MemoryPostCache) WritePost(hash PayloadHash, post *Post) error {
 }
 
 type MemoryPayloadCache struct {
-	Lock sync.RWMutex
+	Lock    sync.RWMutex
 	Content map[PayloadHash]*Payload
 }
 

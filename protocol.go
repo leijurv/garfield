@@ -26,7 +26,7 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 	}
 
 	_, already := dedup[newNonce] //once we know that the pow is acceptable, let's check if we've already seen this nonce
-	dedup[newNonce] = true
+	dedup[newNonce] = true        //only do this after the pow is ok so that they cant spam our ram
 	if already {
 		return nil
 	}
