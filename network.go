@@ -10,23 +10,35 @@ import (
 	"strconv"
 )
 
+type PeerRemovalError struct {
+	error
+}
+
+func (err *PeerRemovalError) IsPeerRemovalError() bool {
+	return true
+}
+
+var (
+	ErrMismatchedShasums PeerRemovalError = PeerRemovalError{errors.New("peer: shasums do not match")}
+)
+
 func readPacketNonceUpdate(peer *Peer) error {
 	payloadHash, err := read32(peer.Conn)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	nonce, err := read32(peer.Conn)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	meta, err := readMeta(peer)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	tieneBytes := make([]byte, 1)
 	_, err = io.ReadFull(peer.Conn, tieneBytes)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	tiene := tieneBytes[0]
 	return onNonceUpdateReceived(payloadHash, *meta, nonce, tiene, peer)
@@ -34,68 +46,70 @@ func readPacketNonceUpdate(peer *Peer) error {
 func readPacketPayloadRequest(peer *Peer) error {
 	payloadHash, err := read32(peer.Conn)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	return onPayloadRequested(payloadHash, peer)
 }
 func readPacketPayload(peer *Peer) error {
 	payloadHash, err := read32(peer.Conn)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	meta, err := readMeta(peer)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	payloadBodyHash, err := read32(peer.Conn)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	chk := sha256.Sum256(append(payloadBodyHash[:], meta.raw...))
 	if !bytes.Equal(chk[:], payloadHash[:]) {
-		Debug.Println("THEY ARE DIFFERENT", chk[:], payloadHash[:], payloadBodyHash[:], meta.raw)
-		return errors.New("BADBADBAD LIAR LIAR PANTS ON FIRE")
+		Warning.Println("Shasums do not match: ", chk[:], payloadHash[:], payloadBodyHash[:], meta.raw)
+		return ErrMismatchedShasums
 	}
 	payloadLenBytes := make([]byte, 2)
 	_, err = io.ReadFull(peer.Conn, payloadLenBytes)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	payloadLen := int(binary.LittleEndian.Uint16(payloadLenBytes))
 	payload := make([]byte, payloadLen)
 	_, err = io.ReadFull(peer.Conn, payload)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	return onPayloadReceived(payloadHash, *meta, payloadBodyHash, payload)
 }
+
 func readPacketGetNonce(peer *Peer) error {
 	payloadHash, err := read32(peer.Conn)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	return onGetNonce(payloadHash, peer)
 }
+
 func readPacketMultiNonce(peer *Peer) error {
 	payloadHash, err := read32(peer.Conn)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	meta, err := readMeta(peer)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	nonceCountBytes := make([]byte, 2)
 	_, err = io.ReadFull(peer.Conn, nonceCountBytes)
 	if err != nil {
-		return err
+		return PeerRemovalError{err}
 	}
 	nonceCount := int(binary.LittleEndian.Uint16(nonceCountBytes))
 	nonces := make([]Nonce, nonceCount)
 	for i := 0; i < nonceCount; i++ {
 		nonce, err := read32(peer.Conn)
 		if err != nil {
-			return err
+			return PeerRemovalError{err}
 		}
 		nonces[i] = nonce
 	}
@@ -128,4 +142,9 @@ func Connect(port string) error {
 	}
 	AddPeer(conn)
 	return nil
+}
+
+func IsPeerRemovalErr(err error) bool {
+	_, ok := err.(PeerRemovalError)
+	return ok
 }
