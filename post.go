@@ -17,6 +17,16 @@ type Nonces [][]Nonce
 
 type Work [][][32]byte
 
+type PostManager struct {
+	Lookup map[PayloadHash]*Post
+	Backing PayloadCache
+}
+
+type PayloadCache interface {
+	GetPayload(PayloadHash) (*Payload, error)
+	WritePayload(PayloadHash, *Payload) error
+}
+
 type Post struct {
 	PayloadHash PayloadHash
 	Nonces      Nonces
@@ -24,6 +34,20 @@ type Post struct {
 	Payload     *Payload
 	work        Work
 	lock        sync.Mutex
+}
+
+func (manager *PostManager) fetchPayload(post *Post) error {
+	post.lock.Lock()
+	defer post.lock.Unlock()
+	if post.Payload != nil {
+		return nil
+	}
+	payload, err := manager.Backing.GetPayload(post.PayloadHash)
+	if err != nil {
+		return err
+	}
+	post.Payload = payload
+	return nil
 }
 
 var posts map[PayloadHash]*Post
