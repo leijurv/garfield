@@ -13,10 +13,10 @@ func (hash PayloadHash) Sentiment(nonce Nonce) (bool, [32]byte) {
 	positive := hash.Work(nonce, true)
 	negative := hash.Work(nonce, false)
 	if bytes.Compare(positive[:], negative[:]) < 0 { //return true if positive is less than negative
-		fmt.Println("Choosing", positive[:], "over", negative[:])
+		Debug.Println("Choosing", positive[:], "over", negative[:])
 		return true, positive
 	} else {
-		fmt.Println("Choosing", negative[:], "over", positive[:])
+		Debug.Println("Choosing", negative[:], "over", positive[:])
 		return false, negative
 	}
 }

@@ -40,7 +40,10 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 			return nil
 		}
 		var flags uint8
-		post := GetPost(postPayloadHash)
+		post, err := postManager.PostBacking.GetPost(postPayloadHash)
+		if err != nil && err != ErrPostMissing {
+			return err
+		}
 		if post != nil && post.HasPayload() { //why check payload? because maybe the meta used to be acceptable but now isn't, but we still have the payload from earlier I guess
 			//don't set HasNonces because we aren't keeping track of the nonces so it would be deceiving
 			flags |= FlagHasPayload
@@ -49,7 +52,10 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 		Broadcast(message)
 		return nil
 	}
-	post := GetPost(postPayloadHash)
+	post, err := postManager.PostBacking.GetPost(postPayloadHash)
+	if err != nil && err != ErrPostMissing {
+		return err
+	}
 	if post != nil {
 		//If we already have either the nonces or the body, let it know we have a new nonce to consider
 		if post.insertIfImprovement(newNonce) {
@@ -78,7 +84,7 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 			//ask the peer we received this from for the nonces for the post because we don't have it
 			message := []byte{uint8(PacketGetNonce)}
 			message = append(message, postPayloadHash[:]...)
-			fmt.Println("data:", message)
+			Debug.Println("data:", message)
 			err := peer.Send(message)
 			if err != nil {
 				return err //this error gets passed all the way back up through the packet handler to peer.Listen, so if writing to this peer fails, we will actually disconnect and remove them
@@ -109,19 +115,25 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 }
 
 func onPayloadReceived(payloadHash PayloadHash, meta Meta, payloadBodyHash [32]byte, payloadBody Payload) error {
-	fmt.Println("Post contents:", payloadBody)
-	post := GetPost(payloadHash)
+	Debug.Println("Post contents:", payloadBody)
+	post, err := postManager.PostBacking.GetPost(payloadHash)
+	if err != nil && err != ErrPostMissing {
+		return err
+	}
 	if post != nil {
-		fmt.Println("Cool, a payload")
+		Debug.Println("Cool, a payload")
 		post.payloadReceived(payloadBody)
 	} else {
-		fmt.Println("While appreciated, I did not ask for contents of", payloadHash, "so I don't have its nonces so I can't accept it")
+		Warning.Println("While appreciated, I did not ask for contents of", payloadHash, "so I don't have its nonces so I can't accept it")
 	}
 	return nil
 }
 func onPayloadRequested(payloadHash PayloadHash, peerFrom *Peer) error {
 	//TODO pow
-	post := GetPost(payloadHash)
+	post, err := postManager.PostBacking.GetPost(payloadHash)
+	if err != nil && err != ErrPostMissing {
+		return err
+	}
 	if post == nil {
 		return nil //um idk we don't have it. just ignore lol
 	}
@@ -129,7 +141,7 @@ func onPayloadRequested(payloadHash PayloadHash, peerFrom *Peer) error {
 		return nil
 	}
 
-	fmt.Println("Sending contents of ", payloadHash)
+	Debug.Println("Sending contents of ", payloadHash)
 	//man I wish go was better at appending mulitple arrays. lol im probbaly doing something wrong here. BUT HEY, IT WORKS
 
 	message := []byte{uint8(PacketPayload)}
@@ -139,8 +151,8 @@ func onPayloadRequested(payloadHash PayloadHash, peerFrom *Peer) error {
 	binary.LittleEndian.PutUint16(payloadLenBytes, uint16(len(*post.Payload)))
 	message = append(message, payloadLenBytes...)
 	message = append(message, *post.Payload...)
-	fmt.Println("data:", message)
-	err := peerFrom.Send(message)
+	Debug.Println("data:", message)
+	err = peerFrom.Send(message)
 	if err != nil {
 		return err
 	}
@@ -148,7 +160,10 @@ func onPayloadRequested(payloadHash PayloadHash, peerFrom *Peer) error {
 }
 
 func onGetNonce(payloadHash PayloadHash, peer *Peer) error {
-	post := GetPost(payloadHash)
+	post, err := postManager.PostBacking.GetPost(payloadHash)
+	if err != nil && err != ErrPostMissing {
+		return err
+	}
 	if post == nil {
 		return nil //um idk we don't have it. just ignore lol
 	}
@@ -169,8 +184,8 @@ func onGetNonce(payloadHash PayloadHash, peer *Peer) error {
 		message = append(message, nonces[i][:]...)
 	}
 
-	fmt.Println("data:", message)
-	err := peer.Send(message)
+	Debug.Println("data:", message)
+	err = peer.Send(message)
 	if err != nil {
 		return err
 	}
@@ -182,7 +197,7 @@ func onPacketMultiNonce(payloadHash PayloadHash, nonces []Nonce, meta Meta, peer
 	if post.Acceptable() { //genPost inserts all these awesome nonces and works where they should go. now we can check if the score is acceptable
 		message := []byte{uint8(PacketPayloadRequest)}
 		message = append(message, payloadHash[:]...)
-		fmt.Println("data:", message)
+		Debug.Println("data:", message)
 		err := peer.Send(message)
 		if err != nil {
 			return err

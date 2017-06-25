@@ -54,7 +54,7 @@ func readPacketPayload(peer *Peer) error {
 	}
 	chk := sha256.Sum256(append(payloadBodyHash[:], meta.raw...))
 	if !bytes.Equal(chk[:], payloadHash[:]) {
-		fmt.Println("THEY ARE DIFFERENT", chk[:], payloadHash[:], payloadBodyHash[:], meta.raw)
+		Debug.Println("THEY ARE DIFFERENT", chk[:], payloadHash[:], payloadBodyHash[:], meta.raw)
 		return errors.New("BADBADBAD LIAR LIAR PANTS ON FIRE")
 	}
 	payloadLenBytes := make([]byte, 2)
@@ -109,20 +109,20 @@ func Listen(port int) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Listening on", port)
+	Info.Println("Listening on", port)
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
 			return err
 		}
-		fmt.Println("Connection from ", conn)
+		Debug.Println("Connection from ", conn)
 		go AddPeer(conn)
 	}
 }
 
 // Connect connects and adds a peer
 func Connect(port string) error {
-	fmt.Println("Connecting to", port)
+	Debug.Println("Connecting to", port)
 	conn, err := net.Dial("tcp", port)
 	if err != nil {
 		return err

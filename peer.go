@@ -28,7 +28,7 @@ func (peer *Peer) remove() {
 	defer peersLock.Unlock()
 	for i := 0; i < len(peers); i++ {
 		if peers[i] == peer {
-			fmt.Println("Removing peer from list")
+			Info.Println("Removing peer from list")
 			peers = append(peers[:i], peers[i+1:]...)
 			return
 		}
@@ -45,7 +45,7 @@ func AddPeer(conn net.Conn) {
 
 	go func() {
 		err := peer.Listen() //note that once peer.Listen returns, it calls peer.remove and peer.Conn.Close in a defer, so no need to do that here
-		fmt.Println("Disconnected", conn, "beacuse of", err)
+		Warning.Println("Disconnected", conn, "beacuse of", err)
 	}()
 }
 func Broadcast(data []byte) { //this does not return an error because it's a best-effort broadcast, it'll just try as many as it can in new goroutines and not bother the caller about any possible sending errors

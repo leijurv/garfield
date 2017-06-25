@@ -3,6 +3,19 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+)
+
+var (
+	// debugOut redirects debug logs to os.Stdout
+	debugOut = os.Stdout
+	// infoOut redirects info logs to os.Stdout
+	infoOut = os.Stdout
+	// warningOut redirects warning logs to os.Stdout
+	warningOut = os.Stdout
+	// errorOut redirects error logs to os.Stderr
+	errorOut = os.Stderr
+
 )
 
 type IntSliceFlag []string
@@ -32,7 +45,7 @@ func main() {
 		for _, port := range connectPorts {
 			err := Connect(port)
 			if err != nil {
-				fmt.Printf("Couldn't connect to peer on port: %v. Error: %v", port, err)
+				Debug.Printf("Couldn't connect to peer on port: %v. Error: %v", port, err)
 			}
 		}
 

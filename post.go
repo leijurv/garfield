@@ -12,20 +12,8 @@ import (
 const bucketSize = 16
 
 type Nonce [32]byte
-
 type Nonces [][]Nonce
-
 type Work [][][32]byte
-
-type PostManager struct {
-	Lookup map[PayloadHash]*Post
-	Backing PayloadCache
-}
-
-type PayloadCache interface {
-	GetPayload(PayloadHash) (*Payload, error)
-	WritePayload(PayloadHash, *Payload) error
-}
 
 type Post struct {
 	PayloadHash PayloadHash
@@ -36,40 +24,12 @@ type Post struct {
 	lock        sync.Mutex
 }
 
-func (manager *PostManager) fetchPayload(post *Post) error {
-	post.lock.Lock()
-	defer post.lock.Unlock()
-	if post.Payload != nil {
-		return nil
+var (
+	postManager = &PostManager{
+		PostBacking: &MemoryPostCache{},
+		PayloadBacking: &MemoryPayloadCache{},
 	}
-	payload, err := manager.Backing.GetPayload(post.PayloadHash)
-	if err != nil {
-		return err
-	}
-	post.Payload = payload
-	return nil
-}
-
-var posts map[PayloadHash]*Post
-var postsLock sync.Mutex
-
-func getReq(payloadHash PayloadHash) *Post {
-	postsLock.Lock()
-	defer postsLock.Unlock()
-	post, ok := posts[payloadHash]
-	if !ok {
-		return nil
-	}
-	return post
-}
-func GetPost(payloadHash PayloadHash) *Post {
-	post := getReq(payloadHash)
-	if post != nil {
-		return post
-	}
-	//TODO check disk
-	return nil
-}
+)
 
 func (post *Post) PayloadBodyHash() [32]byte {
 	return post.Payload.BodyHash()
@@ -137,17 +97,14 @@ func genPost(payloadHash PayloadHash, nonces []Nonce, meta Meta) *Post {
 	if !meta.Verify() {
 		panic("no")
 	}
-	postsLock.Lock()
-	defer postsLock.Unlock()
-
-	post := GetPost(payloadHash)
+	post, _ := postManager.PostBacking.GetPost(payloadHash)
 	if post == nil {
 		post := &Post{
 			PayloadHash: payloadHash,
 			Meta:        meta,
 			Payload:     nil,
 		}
-		posts[payloadHash] = post //do all this in the lock
+		postManager.PostBacking.WritePost(payloadHash, post) //do all this in the lock
 	}
 
 	for i := 0; i < len(nonces); i++ {
@@ -188,7 +145,7 @@ func (post *Post) insertIfImprovement(nonce Nonce) bool { //this func only retur
 		//get the WORST one we currently have. replacing that one with the better option will result in the most improvement, and will maintain the invariant of the 16 best at this depth
 		if bytes.Compare(newWork[:], post.work[depth][index][:]) < 0 { //this is a < not a <= so as not to replace with the same thing.
 			//ding ding we have a winner
-			fmt.Println("Replacing", post.work[depth][index][:], "with lower", newWork[:])
+			Debug.Println("Replacing", post.work[depth][index][:], "with lower", newWork[:])
 			chk1, _ := calcDepth(post.work[depth][index])
 			chk2, _ := calcDepth(newWork)
 			if chk1 != chk2 || chk1 != depth || chk2 != depth {
@@ -198,11 +155,11 @@ func (post *Post) insertIfImprovement(nonce Nonce) bool { //this func only retur
 			post.Nonces[depth][index] = nonce
 			return true
 		}
-		fmt.Println(newWork[:], "did not improve on ANY of", post.work[depth])
+		Debug.Println(newWork[:], "did not improve on ANY of", post.work[depth])
 		//if we can't improve on the worst at this depth, then fail
 		return false
 	} else {
-		fmt.Println("Adding new work because I have space for it", newWork[:])
+		Debug.Println("Adding new work because I have space for it", newWork[:])
 		post.work[depth] = append(post.work[depth], newWork)
 		post.Nonces[depth] = append(post.Nonces[depth], nonce)
 		return true
@@ -260,7 +217,7 @@ func (post *Post) Mine(count int) {
 	for i := 0; i < count; i++ {
 		if post.insertIfImprovement(nonce) { //TODO this is mining for both sentiments lol
 			_, newWork := post.PayloadHash.Sentiment(nonce)
-			fmt.Println("Nonce improvement, hash is now ", newWork[:])
+			Debug.Println("Nonce improvement, hash is now ", newWork[:])
 		}
 		nonce[31]++
 		if nonce[31] == 0 {
