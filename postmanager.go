@@ -75,7 +75,7 @@ func (cache *MemoryPayloadCache) GetPayload(hash PayloadHash) (*Payload, error) 
 	if !ok {
 		return nil, ErrPayloadMissing
 	}
-	return payload, ok
+	return payload, nil
 }
 
 func (cache *MemoryPayloadCache) WritePayload(hash PayloadHash, payload *Payload) error {
