@@ -134,6 +134,7 @@ func onPayloadReceived(payloadHash PayloadHash, meta Meta, payloadBodyHash [32]b
 	}
 	return nil
 }
+
 func onPayloadRequested(payloadHash PayloadHash, peerFrom *Peer) error {
 	//TODO pow
 	post := GetPost(payloadHash)
@@ -192,6 +193,7 @@ func onGetNonce(payloadHash PayloadHash, peer *Peer) error {
 	return nil
 	//even if we dont have the payload, its ok to just send our best nonces for this payload hash
 }
+
 func onPacketMultiNonce(payloadHash PayloadHash, nonces []Nonce, meta Meta, peer *Peer) error {
 	post := genPost(payloadHash, nonces, meta)
 	if post.Acceptable() { //genPost inserts all these awesome nonces and works where they should go. now we can check if the score is acceptable
