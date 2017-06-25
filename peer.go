@@ -76,6 +76,5 @@ func (peer *Peer) Listen() error {
 		if err != nil {
 			return err
 		}
-
 	}
 }

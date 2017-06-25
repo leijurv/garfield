@@ -3,8 +3,8 @@ package main
 import (
 	//"crypto/sha256"
 	"encoding/binary"
-	"fmt"
 	//"time"
+	"errors"
 )
 
 const (
@@ -14,7 +14,23 @@ const (
 	FlagAcceptableMeta
 )
 
+var dedup map[Nonce]bool
+
 func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonce, tiene byte, peer *Peer) error {
+	//TODO maybe send payloadBodyHash + meta instead of postPayloadHash
+	_, newWork := postPayloadHash.Sentiment(newNonce)
+	_, ok := calcDepth(newWork)
+	if !ok {
+		//we just received a nonce update resulting in work less than minimum depth
+		return errors.New("stop lying to me")
+	}
+
+	_, already := dedup[newNonce] //once we know that the pow is acceptable, let's check if we've already seen this nonce
+	dedup[newNonce] = true
+	if already {
+		return nil
+	}
+
 	message := []byte{uint8(PacketNonceUpdate)}
 	message = append(message, postPayloadHash[:]...)
 	message = append(message, newNonce[:]...)
@@ -23,7 +39,7 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 		panic("not long enough")
 	}
 	message = append(message, meta.Write()...)
-	//TODO verify minimum depth before processing any further, and certainly before relaying!!!!!
+
 	if !meta.Verify() { //we don't care
 		if tiene&FlagHasNonces == 0 {
 			//we just received from someone who also doesn't know what they are doing
@@ -108,9 +124,7 @@ func onNonceUpdateReceived(postPayloadHash PayloadHash, meta Meta, newNonce Nonc
 				//TODO broadcast a getnonce to everyone lol
 			}
 		}
-
 	}
-
 	return nil
 }
 
@@ -128,6 +142,7 @@ func onPayloadReceived(payloadHash PayloadHash, meta Meta, payloadBodyHash [32]b
 	}
 	return nil
 }
+
 func onPayloadRequested(payloadHash PayloadHash, peerFrom *Peer) error {
 	//TODO pow
 	post, err := postManager.PostBacking.GetPost(payloadHash)
@@ -192,6 +207,7 @@ func onGetNonce(payloadHash PayloadHash, peer *Peer) error {
 	return nil
 	//even if we dont have the payload, its ok to just send our best nonces for this payload hash
 }
+
 func onPacketMultiNonce(payloadHash PayloadHash, nonces []Nonce, meta Meta, peer *Peer) error {
 	post := genPost(payloadHash, nonces, meta)
 	if post.Acceptable() { //genPost inserts all these awesome nonces and works where they should go. now we can check if the score is acceptable
